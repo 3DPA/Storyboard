@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: scenes
+    // Document ID: scene_{index}
+    // Fields:
+    //   - visual: string (required, max 2000 chars)
+    //   - dialogue: string (required, max 1000 chars)
+    //   - completed: bool (required)
+    //   - updatedAt: number (required)
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - role: string (required, 'admin' | 'student')
+    //   - email: string (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdaptcnEmail() {
+      return isAuthenticated() && 
+             request.auth.token.email.matches(".*@adaptcn\\.org$");
+    }
+
+    function isAdmin() {
+      return isAdaptcnEmail() &&
+        ( (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          request.auth.token.email == "ptudisco@adaptcn.org"); // Primary admin
+    }
+
+    function isValidScene(data) {
+      return data.keys().hasAny(['visual', 'narration', 'dialogue', 'completed', 'updatedAt']) &&
+             (!('title' in data) || (data.title is string && data.title.size() <= 200)) &&
+             (!('visual' in data) || (data.visual is string && data.visual.size() <= 5000)) &&
+             (!('narration' in data) || (data.narration is string && data.narration.size() <= 2000)) &&
+             (!('dialogue' in data) || (data.dialogue is string && data.dialogue.size() <= 2000)) &&
+             (!('completed' in data) || (data.completed is bool)) &&
+             (!('updatedAt' in data) || (data.updatedAt is number));
+    }
+
+    function isValidUser(data) {
+      return (!('role' in data) || data.role in ['admin', 'student']) &&
+             (!('email' in data) || (data.email is string && data.email.matches(".*@adaptcn\\.org$"))) &&
+             (!('googleDocId' in data) || (data.googleDocId is string && data.googleDocId.size() < 100));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAdaptcnEmail() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAdaptcnEmail() && (request.auth.uid == userId) && request.resource.data.role == 'student';
+      allow update: if isAdaptcnEmail() && (request.auth.uid == userId || isAdmin());
+
+      match /scenes/{sceneId} {
+        // Security Protocol: Only the owner or admin can access user-specific scenes
+        allow read: if isAdaptcnEmail() && (request.auth.uid == userId || isAdmin());
+        allow create, update: if isAdaptcnEmail() && (request.auth.uid == userId) && isValidScene(request.resource.data);
+        allow delete: if isAdmin();
+      }
+    }
+  }
+}

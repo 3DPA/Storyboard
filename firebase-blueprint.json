@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "Scene": {
+      "title": "Scene",
+      "description": "A single panel in the storyboard",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title of the scene"
+        },
+        "visual": {
+          "type": "string",
+          "description": "Description of the visuals"
+        },
+        "narration": {
+          "type": "string",
+          "description": "Narration or script for the scene"
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Whether the scene is marked as done"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Timestamp of last update"
+        }
+      },
+      "required": [
+        "title",
+        "visual",
+        "narration",
+        "completed"
+      ]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and roles",
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["admin", "student"],
+          "description": "User role"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      },
+      "required": ["role"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/scenes/{sceneId}": {
+      "schema": "Scene",
+      "description": "User-specific storyboard scenes"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User roles and profiles"
+    }
+  }
+}
